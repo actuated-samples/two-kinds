@@ -50,7 +50,7 @@ jobs:
                   protocol: TCP
               EOF
 
-        - uses: self-actuated/connect-ssh@master
+#        - uses: self-actuated/connect-ssh@master
 
         - name: Install ingress-nginx and wait for it
           run: |
@@ -68,7 +68,7 @@ jobs:
                   --selector=app.kubernetes.io/component=controller \
                   --timeout=90s
           shell: bash
-          timeout-minutes: 3
+          timeout-minutes: 2
 
         - name: Show kubelet logs
           if: always()
