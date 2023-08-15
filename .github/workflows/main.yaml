@@ -1,0 +1,66 @@
+name: main
+
+on: push
+
+jobs:
+    kind-ingress-test:
+      runs-on: ${{ matrix.runner }}
+      strategy:
+        fail-fast: false
+        matrix:
+          runner:
+            - actuated
+            - ubuntu-latest
+      steps:
+        - uses: actions/checkout@master
+          with:
+            fetch-depth: 1
+        # Prevent any image throttling from DockerHub (e.g. for KinD)
+        - name: Set up Actuated mirror
+          uses: self-actuated/hub-mirror@master
+
+        - uses: helm/kind-action@v1.8.0
+          with:
+            install_only: true
+
+        - name: Create cluster with extra ports open
+          run: |
+              cat <<EOF | kind create cluster --config=-
+              kind: Cluster
+              apiVersion: kind.x-k8s.io/v1alpha4
+              nodes:
+              - role: control-plane
+                kubeadmConfigPatches:
+                - |
+                  kind: InitConfiguration
+                  nodeRegistration:
+                    kubeletExtraArgs:
+                      node-labels: "ingress-ready=true"
+                extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+                - containerPort: 443
+                  hostPort: 443
+                  protocol: TCP
+              EOF
+
+        - name: Install ingress-nginx and wait for it
+          run: |
+              kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+              # we cannot just wait immediately, it triggers a race so first ensure something spins up to wait on
+              until kubectl get pod --namespace ingress-nginx -l app.kubernetes.io/component=controller | grep -q 'Running'
+              do
+                  sleep 10
+              done
+
+              # Now wait for the condition
+              kubectl wait --namespace ingress-nginx \
+                  --for=condition=ready pod \
+                  --selector=app.kubernetes.io/component=controller \
+                  --timeout=90s
+          shell: bash
+          timeout-minutes: 10
+
+          
