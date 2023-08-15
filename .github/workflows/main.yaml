@@ -2,6 +2,11 @@ name: main
 
 on: push
 
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
 jobs:
     kind-ingress-test:
       runs-on: ${{ matrix.runner }}
@@ -44,6 +49,8 @@ jobs:
                   hostPort: 443
                   protocol: TCP
               EOF
+
+        - uses: self-actuated/connect-ssh@master
 
         - name: Install ingress-nginx and wait for it
           run: |
